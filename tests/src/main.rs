@@ -113,7 +113,7 @@ fn test_font_tools(font_file: &str, gids: &str, variations: &str, num: u16) {
     let gids_vec: Vec<_> = parse_gids(gids, face.number_of_glyphs());
     let remapper = GlyphRemapper::new_from_glyphs(gids_vec.as_slice());
     let variations = parse_variations(variations);
-    let subset = subset_with_variations(&data, 0, &variations, &remapper).unwrap();
+    let subset = subset_with_variations(&data, 0, &variations, &remapper, None).unwrap();
 
     std::fs::write(otf_path.clone(), subset).unwrap();
 
@@ -405,5 +405,57 @@ impl ttf_parser::OutlineBuilder for Sink {
 
     fn close(&mut self) {
         self.0.push(Inst::Close);
+    }
+}
+
+/// A grid of 64 font units, far coarser than a real one, so that each glyph changes.
+fn coarse(advance: u16, _units_per_em: u16) -> u16 {
+    advance / 64 * 64
+}
+
+const QUANTISED_GIDS: [u16; 6] = [0, 10, 20, 36, 68, 80];
+
+fn advances(subset: &[u8], mapper: &GlyphRemapper) -> Vec<u16> {
+    let face = ttf_parser::Face::parse(subset, 0).unwrap();
+    QUANTISED_GIDS
+        .iter()
+        .map(|&gid| face.glyph_hor_advance(GlyphId(mapper.get(gid).unwrap())).unwrap())
+        .collect()
+}
+
+#[test]
+fn an_advance_quantisation_quantises_the_hmtx_of_the_subset() {
+    let data = read_file("NotoSans-Regular.ttf");
+    let mapper = GlyphRemapper::new_from_glyphs(&QUANTISED_GIDS);
+    let natural = advances(&subset(&data, 0, &mapper).unwrap(), &mapper);
+    let quantised = advances(
+        &subset_with_variations(&data, 0, &[], &mapper, Some(coarse)).unwrap(),
+        &mapper,
+    );
+    let expected: Vec<_> = natural.iter().map(|&advance| coarse(advance, 0)).collect();
+    assert_eq!(quantised, expected);
+    assert_ne!(quantised, natural, "the coarse grid changes an advance");
+}
+
+#[test]
+fn an_advance_quantisation_keeps_the_change_of_a_variation_instance() {
+    let data = read_file("NotoSans-Regular_var.ttf");
+    let mapper = GlyphRemapper::new_from_glyphs(&QUANTISED_GIDS);
+    let bold = [(Tag::from_str("wght").unwrap(), 700.0)];
+    let defaults = advances(&subset(&data, 0, &mapper).unwrap(), &mapper);
+    let natural = advances(
+        &subset_with_variations(&data, 0, &bold, &mapper, None).unwrap(),
+        &mapper,
+    );
+    let quantised = advances(
+        &subset_with_variations(&data, 0, &bold, &mapper, Some(coarse)).unwrap(),
+        &mapper,
+    );
+    assert_ne!(natural, defaults, "the instance changes an advance");
+    for ((quantised, natural), default) in quantised.iter().zip(&natural).zip(&defaults) {
+        assert_eq!(
+            i32::from(*quantised),
+            i32::from(*natural) + i32::from(coarse(*default, 0)) - i32::from(*default)
+        );
     }
 }

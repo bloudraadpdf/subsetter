@@ -106,8 +106,13 @@ use std::str::FromStr;
 ///
 /// CFF2 fonts are not supported.
 pub fn subset(data: &[u8], index: u32, mapper: &GlyphRemapper) -> Result<Vec<u8>> {
-    subset_inner(data, index, &[], false, mapper)
+    subset_inner(data, index, &[], false, mapper, None)
 }
+
+/// Quantises the default-instance advance of a glyph in font units, given the
+/// units per em of its font: the grid of the advances that a consumer of the
+/// subset uses (a PDF writer states widths in 1/1000 em).
+pub type AdvanceQuantisation = fn(advance: u16, units_per_em: u16) -> u16;
 
 /// Subset the font face to include only the necessary glyphs and tables, instantiated
 /// to the given variation coordinates.
@@ -116,14 +121,19 @@ pub fn subset(data: &[u8], index: u32, mapper: &GlyphRemapper) -> Result<Vec<u8>
 ///
 /// It is important to note that if you pass a CFF2 font, it will be converted to a TrueType
 /// font.
+///
+/// With an `advance_quantisation`, the `hmtx` table of the subset holds the quantised
+/// advance of each glyph: its default-instance advance on the grid, plus the change of
+/// the variation instance.
 #[cfg(feature = "variable-fonts")]
 pub fn subset_with_variations(
     data: &[u8],
     index: u32,
     variation_coordinates: &[(Tag, f32)],
     mapper: &GlyphRemapper,
+    advance_quantisation: Option<AdvanceQuantisation>,
 ) -> Result<Vec<u8>> {
-    subset_inner(data, index, variation_coordinates, true, mapper)
+    subset_inner(data, index, variation_coordinates, true, mapper, advance_quantisation)
 }
 
 fn subset_inner(
@@ -132,10 +142,17 @@ fn subset_inner(
     variation_coordinates: &[(Tag, f32)],
     allow_cff2: bool,
     mapper: &GlyphRemapper,
+    advance_quantisation: Option<AdvanceQuantisation>,
 ) -> Result<Vec<u8>> {
     let mapper = mapper.clone();
-    let context =
-        prepare_context(data, index, variation_coordinates, allow_cff2, mapper)?;
+    let context = prepare_context(
+        data,
+        index,
+        variation_coordinates,
+        allow_cff2,
+        mapper,
+        advance_quantisation,
+    )?;
     _subset(context)
 }
 
@@ -146,6 +163,7 @@ fn prepare_context<'a>(
     variation_coordinates: &[(Tag, f32)],
     allow_cff2: bool,
     mut gid_remapper: GlyphRemapper,
+    advance_quantisation: Option<AdvanceQuantisation>,
 ) -> Result<Context<'a>> {
     let face = parse(data, index)?;
     let flavor = if face.table(Tag::GLYF).is_some() {
@@ -200,6 +218,7 @@ fn prepare_context<'a>(
         interjector,
         custom_maxp_data: None,
         custom_hmtx_data: None,
+        advance_quantisation,
         flavor,
         tables: vec![],
         long_loca: false,
@@ -384,6 +403,8 @@ struct Context<'a> {
     /// where we need to synthesize a V1 table after converting.
     pub(crate) custom_maxp_data: Option<MaxpData>,
     pub(crate) custom_hmtx_data: Option<Vec<(u16, i16)>>,
+    /// The grid of the advances in the `hmtx` table of the subset.
+    advance_quantisation: Option<AdvanceQuantisation>,
     /// Whether the long loca format was chosen.
     long_loca: bool,
 }

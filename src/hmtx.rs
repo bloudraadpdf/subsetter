@@ -29,6 +29,10 @@ pub fn subset(ctx: &mut Context) -> Result<()> {
 
         new_metrics
     };
+    let new_metrics = match ctx.advance_quantisation {
+        Some(quantise) => quantise_advances(hmtx, new_metrics, quantise, ctx)?,
+        None => new_metrics,
+    };
 
     // Find out the last index we need to include the advance width for.
     let mut last_advance_width_index =
@@ -64,6 +68,42 @@ pub fn subset(ctx: &mut Context) -> Result<()> {
     ctx.push(Tag::HHEA, sub_hhea.finish());
 
     Ok(())
+}
+
+/// Moves the advance of each glyph by the change that `quantise` makes to its
+/// default-instance advance, so that a variation keeps its full value.
+fn quantise_advances(
+    #[cfg_attr(not(feature = "variable-fonts"), allow(unused))] hmtx: &[u8],
+    mut metrics: Vec<(u16, i16)>,
+    quantise: AdvanceQuantisation,
+    ctx: &mut Context,
+) -> Result<Vec<(u16, i16)>> {
+    let units_per_em = {
+        let head = ctx.expect_table(Tag::HEAD).ok_or(MalformedFont)?;
+        let mut r = Reader::new(head);
+        r.skip_bytes(18);
+        r.read::<u16>().ok_or(MalformedFont)?
+    };
+    let moved = |advance: u16, default: u16| {
+        let change = i32::from(quantise(default, units_per_em)) - i32::from(default);
+        u16::try_from(i32::from(advance) + change).map_err(|_| OverflowError)
+    };
+    match &ctx.interjector {
+        Interjector::Dummy(_) => {
+            for metric in &mut metrics {
+                metric.0 = moved(metric.0, metric.0)?;
+            }
+        }
+        #[cfg(feature = "variable-fonts")]
+        Interjector::Skrifa(_) => {
+            let mut defaults = vec![];
+            extract_metrics(hmtx, &mut defaults, ctx)?;
+            for (metric, (default, _)) in metrics.iter_mut().zip(defaults) {
+                metric.0 = moved(metric.0, default)?;
+            }
+        }
+    }
+    Ok(metrics)
 }
 
 fn extract_metrics(
