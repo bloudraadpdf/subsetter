@@ -160,12 +160,12 @@ dependencies = [
 
 [[package]]
 name = "kurbo"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7564e90fe3c0d5771e1f0bc95322b21baaeaa0d9213fa6a0b61c99f8b17b3bfb"
+version = "0.13.1"
+source = "git+ssh://git@git.bloudraad.io/external/kurbo.git?rev=03da2023aac55316eb6287253b34c3f348b775ae#03da2023aac55316eb6287253b34c3f348b775ae"
 dependencies = [
  "arrayvec",
  "euclid",
+ "polycool",
  "smallvec",
 ]
 
@@ -202,6 +202,14 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "polycool"
+version = "0.4.0"
+source = "git+ssh://git@git.bloudraad.io/external/kurbo.git?rev=03da2023aac55316eb6287253b34c3f348b775ae#03da2023aac55316eb6287253b34c3f348b775ae"
+dependencies = [
+ "arrayvec",
+]
 
 [[package]]
 name = "ppv-lite86"
@@ -505,8 +513,7 @@ dependencies = [
 [[package]]
 name = "write-fonts"
 version = "0.52.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "843cebb7bd36359861dbce43d54ac8b33dfdf7b80a95913adc1ef7c7bb881e62"
+source = "git+ssh://git@git.bloudraad.io/external/fontations.git?rev=10a9b6cb613206dab1848e8e79e46ef7b8d997d7#10a9b6cb613206dab1848e8e79e46ef7b8d997d7"
 dependencies = [
  "font-types 0.12.6",
  "indexmap",

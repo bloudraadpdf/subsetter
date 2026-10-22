@@ -32,8 +32,8 @@ variable-fonts = ["dep:skrifa", "dep:write-fonts", "dep:kurbo"]
 [dependencies]
 rustc-hash = "2.1"
 skrifa = { optional = true, version = "0.46.2" }
-kurbo = { optional = true, version = "0.13.0" }
-write-fonts = { optional = true, version = "0.52.0" }
+kurbo = { optional = true, git = "ssh://git@git.bloudraad.io/external/kurbo.git", rev = "03da2023aac55316eb6287253b34c3f348b775ae" }
+write-fonts = { optional = true, git = "ssh://git@git.bloudraad.io/external/fontations.git", rev = "10a9b6cb613206dab1848e8e79e46ef7b8d997d7" }
 
 [dev-dependencies]
 skrifa = "0.46.2"
