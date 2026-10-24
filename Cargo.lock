@@ -317,8 +317,7 @@ dependencies = [
 [[package]]
 name = "read-fonts"
 version = "0.43.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "005c8acf251756c478b0bf402885bfd88a1476020c4c7e6060edc1aa68da38ea"
+source = "git+ssh://git@git.bloudraad.io/external/fontations.git?rev=c4c9501abff873702bca4b8d04f867cc7742de39#c4c9501abff873702bca4b8d04f867cc7742de39"
 dependencies = [
  "bytemuck",
  "font-types 0.12.6",
@@ -353,8 +352,7 @@ dependencies = [
 [[package]]
 name = "skrifa"
 version = "0.46.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4febebda507fb889c545a37a135517769d1391941013561292897961d1887d6"
+source = "git+ssh://git@git.bloudraad.io/external/fontations.git?rev=c4c9501abff873702bca4b8d04f867cc7742de39#c4c9501abff873702bca4b8d04f867cc7742de39"
 dependencies = [
  "bytemuck",
  "read-fonts 0.43.3",
@@ -513,7 +511,7 @@ dependencies = [
 [[package]]
 name = "write-fonts"
 version = "0.52.0"
-source = "git+ssh://git@git.bloudraad.io/external/fontations.git?rev=10a9b6cb613206dab1848e8e79e46ef7b8d997d7#10a9b6cb613206dab1848e8e79e46ef7b8d997d7"
+source = "git+ssh://git@git.bloudraad.io/external/fontations.git?rev=c4c9501abff873702bca4b8d04f867cc7742de39#c4c9501abff873702bca4b8d04f867cc7742de39"
 dependencies = [
  "font-types 0.12.6",
  "indexmap",
