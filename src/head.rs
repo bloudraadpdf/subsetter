@@ -12,3 +12,20 @@ pub fn subset(ctx: &mut Context) -> Result<()> {
     ctx.push(Tag::HEAD, head);
     Ok(())
 }
+
+#[cfg(feature = "variable-fonts")]
+pub(crate) fn update_bounds(ctx: &mut Context) -> Result<()> {
+    let Some(bounds) = ctx.glyph_bounds else {
+        return Ok(());
+    };
+    let (_, head) = ctx
+        .tables
+        .iter_mut()
+        .find(|(tag, _)| *tag == Tag::HEAD)
+        .ok_or(MalformedFont)?;
+    let target = head.to_mut().get_mut(36..44).ok_or(MalformedFont)?;
+    for (value, bytes) in bounds.into_iter().zip(target.chunks_exact_mut(2)) {
+        bytes.copy_from_slice(&value.to_be_bytes());
+    }
+    Ok(())
+}

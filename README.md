@@ -19,6 +19,11 @@ In the future,
 For an example on how to use this crate, have a look at the 
 [documentation](https://docs.rs/subsetter/latest/subsetter/).
 
+For simple PDF TrueType form fonts, `instance_for_simple_pdf` materialises the
+selected face and variation instance while retaining every glyph ID and the
+original `cmap`. It uses the existing `variable-fonts` feature. Ordinary subsets
+continue to omit `cmap` for CID fonts.
+
 ## Limitations
 As mentioned above, this crate is specifically aimed at subsetting a font with the purpose of 
 including it in a PDF file. For any other purposes, this crate will most likely not be very useful.

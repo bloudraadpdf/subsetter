@@ -11,6 +11,30 @@
 //! 5. We need to update the `loca` table itself with the new offsets.
 use super::*;
 
+#[cfg(feature = "variable-fonts")]
+pub(crate) fn validate(face: &Face, count: u16) -> Result<()> {
+    let table = Table::new(face).ok_or(MalformedFont)?;
+    for glyph in 0..count {
+        let data = table.glyph_data(glyph).ok_or(MalformedFont)?;
+        if data.is_empty() {
+            continue;
+        }
+        let mut reader = Reader::new(data);
+        let contours = reader.read::<i16>().ok_or(MalformedFont)?;
+        for _ in 0..4 {
+            reader.read::<i16>().ok_or(MalformedFont)?;
+        }
+        if contours < 0
+            && component_glyphs(data)
+                .ok_or(MalformedFont)?
+                .any(|glyph| glyph >= count)
+        {
+            return Err(MalformedFont);
+        }
+    }
+    Ok(())
+}
+
 /// Form the glyph closure of all glyphs in `gid_set`.
 pub fn closure(face: &Face, glyph_remapper: &mut GlyphRemapper) -> Result<()> {
     let table = Table::new(face).ok_or(MalformedFont)?;
@@ -96,6 +120,27 @@ pub(crate) fn subset_with<'a>(
     };
 
     for entry in &subsetted_entries {
+        if !entry.is_empty() {
+            let mut reader = Reader::new_at(entry, 2);
+            let bounds = [
+                reader.read::<i16>().ok_or(MalformedFont)?,
+                reader.read::<i16>().ok_or(MalformedFont)?,
+                reader.read::<i16>().ok_or(MalformedFont)?,
+                reader.read::<i16>().ok_or(MalformedFont)?,
+            ];
+            if bounds[0] > bounds[2] || bounds[1] > bounds[3] {
+                return Err(MalformedFont);
+            }
+            ctx.glyph_bounds = Some(match ctx.glyph_bounds {
+                None => bounds,
+                Some(old) => [
+                    old[0].min(bounds[0]),
+                    old[1].min(bounds[1]),
+                    old[2].max(bounds[2]),
+                    old[3].max(bounds[3]),
+                ],
+            });
+        }
         write_offset(sub_glyf.len());
         sub_glyf.extend(entry);
 

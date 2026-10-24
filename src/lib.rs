@@ -17,8 +17,9 @@ of a general-purpose subsetter in the Rust ecosystem.
 # Notes
 A couple of important notes if you want to use this crate in combination with your own pdf writer:
 
-- You must write your fonts as a CID font. This is because we remove the `cmap` table from the font,
-  so you must provide your own cmap table in the PDF.
+- Subsets must be written as CID fonts because their `cmap` table is removed.
+  For complete TrueType programmes in simple PDF fonts, `instance_for_simple_pdf`
+  retains the original glyph IDs and `cmap` instead.
 - Copyright information in the font will be retained.
 - When writing a CID font in PDF, CIDs must be used to address glyphs. This can be pretty tricky,
   because the meaning of CID depends on the type of font you are embedding (see the PDF specification
@@ -126,6 +127,67 @@ pub fn subset_with_variations(
     subset_inner(data, index, variation_coordinates, true, mapper)
 }
 
+/// Materialise a complete TrueType face for a simple PDF font, retaining glyph IDs and cmap.
+/// Coordinates are design-space axis values, as in [`subset_with_variations`].
+/// The PDF writer must apply its simple font encoding's cmap selection rules.
+/// This is a PDF font programme, not a general-purpose editable OpenType font.
+#[cfg(feature = "variable-fonts")]
+pub fn instance_for_simple_pdf(
+    data: &[u8],
+    index: u32,
+    coordinates: &[(Tag, f32)],
+) -> Result<Vec<u8>> {
+    use skrifa::{
+        raw::{tables::cmap::CmapIterLimits, TableProvider},
+        MetadataProvider,
+    };
+    let font = skrifa::FontRef::from_index(data, index).map_err(|_| MalformedFont)?;
+    let count = font.maxp().map_err(|_| MalformedFont)?.num_glyphs();
+    let head = font.head().map_err(|_| MalformedFont)?;
+    if count == 0
+        || head.units_per_em() == 0
+        || !matches!(head.index_to_loc_format(), 0 | 1)
+        || !font.charmap().has_map()
+        || font.charmap().is_symbol()
+    {
+        return Err(MalformedFont);
+    }
+    let hhea = font.hhea().map_err(|_| MalformedFont)?;
+    if hhea.number_of_h_metrics() == 0 || hhea.number_of_h_metrics() > count {
+        return Err(MalformedFont);
+    }
+    font.hmtx().map_err(|_| MalformedFont)?;
+    font.name().map_err(|_| MalformedFont)?;
+    font.post().map_err(|_| MalformedFont)?;
+    let cmap = font.cmap().map_err(|_| MalformedFont)?;
+    for record in cmap.encoding_records() {
+        let subtable = record.subtable(cmap.offset_data()).map_err(|_| MalformedFont)?;
+        if subtable
+            .iter_with_limits(CmapIterLimits {
+                max_char: 0x10ffff,
+                glyph_count: u32::MAX,
+            })
+            .any(|(_, glyph)| glyph.to_u32() >= u32::from(count))
+        {
+            return Err(MalformedFont);
+        }
+    }
+    let face = parse(data, index)?;
+    glyf::validate(&face, count)?;
+    let mut mapper = GlyphRemapper::new();
+    for glyph in 0..count {
+        mapper.remap(glyph);
+    }
+    let mut context = prepare_context(data, index, coordinates, false, mapper.clone())?;
+    if context.mapper != mapper {
+        return Err(MalformedFont);
+    }
+    context.process(Tag::CMAP)?;
+    let mut context = subset_tables(context)?;
+    head::update_bounds(&mut context)?;
+    Ok(construct(context))
+}
+
 fn subset_inner(
     data: &[u8],
     index: u32,
@@ -136,7 +198,7 @@ fn subset_inner(
     let mapper = mapper.clone();
     let context =
         prepare_context(data, index, variation_coordinates, allow_cff2, mapper)?;
-    _subset(context)
+    Ok(construct(subset_tables(context)?))
 }
 
 fn prepare_context<'a>(
@@ -200,13 +262,14 @@ fn prepare_context<'a>(
         interjector,
         custom_maxp_data: None,
         custom_hmtx_data: None,
+        glyph_bounds: None,
         flavor,
         tables: vec![],
         long_loca: false,
     })
 }
 
-fn _subset(mut ctx: Context) -> Result<Vec<u8>> {
+fn subset_tables(mut ctx: Context) -> Result<Context> {
     // See here for the required tables:
     // https://learn.microsoft.com/en-us/typography/opentype/spec/otff#required-tables
     // but some of those are not strictly needed according to the PDF specification.
@@ -246,7 +309,7 @@ fn _subset(mut ctx: Context) -> Result<Vec<u8>> {
     ctx.process(Tag::NAME)?;
     ctx.process(Tag::POST)?;
 
-    Ok(construct(ctx))
+    Ok(ctx)
 }
 
 /// Parse a font face from OpenType data.
@@ -384,6 +447,7 @@ struct Context<'a> {
     /// where we need to synthesize a V1 table after converting.
     pub(crate) custom_maxp_data: Option<MaxpData>,
     pub(crate) custom_hmtx_data: Option<Vec<(u16, i16)>>,
+    glyph_bounds: Option<[i16; 4]>,
     /// Whether the long loca format was chosen.
     long_loca: bool,
 }
@@ -708,3 +772,6 @@ mod tests {
         assert_eq!(face.table(Tag::HEAD), None);
     }
 }
+
+#[cfg(all(test, feature = "variable-fonts"))]
+mod simple_pdf_tests;
