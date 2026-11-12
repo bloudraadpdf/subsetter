@@ -31,10 +31,10 @@ variable-fonts = ["dep:skrifa", "dep:write-fonts", "dep:kurbo"]
 
 [dependencies]
 rustc-hash = "2.1"
-skrifa = { optional = true, git = "ssh://git@git.bloudraad.io/external/fontations.git", rev = "c4c9501abff873702bca4b8d04f867cc7742de39" }
+skrifa = { optional = true, git = "ssh://git@git.bloudraad.io/external/fontations.git", rev = "b52c4e8fdf905274c7d557daf2f43087aea35209" }
 kurbo = { optional = true, git = "ssh://git@git.bloudraad.io/external/kurbo.git", rev = "03da2023aac55316eb6287253b34c3f348b775ae" }
-write-fonts = { optional = true, git = "ssh://git@git.bloudraad.io/external/fontations.git", rev = "c4c9501abff873702bca4b8d04f867cc7742de39" }
+write-fonts = { optional = true, git = "ssh://git@git.bloudraad.io/external/fontations.git", rev = "b52c4e8fdf905274c7d557daf2f43087aea35209" }
 
 [dev-dependencies]
-skrifa = { git = "ssh://git@git.bloudraad.io/external/fontations.git", rev = "c4c9501abff873702bca4b8d04f867cc7742de39" }
+skrifa = { git = "ssh://git@git.bloudraad.io/external/fontations.git", rev = "b52c4e8fdf905274c7d557daf2f43087aea35209" }
 ttf-parser = "0.25.1"
